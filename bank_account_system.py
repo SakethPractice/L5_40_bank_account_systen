@@ -3,7 +3,6 @@
 import hashlib
 import os
 import random
-import sys
 
 account_data = {}
 
@@ -12,32 +11,33 @@ def createAccount(acc_id, name, initial_deposit=0, transactions=[]):
     if acc_id in account_data:
         return False
     account_data[acc_id] = {"name": name, "balance": initial_deposit}
-    transactions.append("Created %s with initial balance %d" % (acc_id, initial_deposit))
+    transactions.append(
+        "Created %s with initial balance %d" % (acc_id, initial_deposit)
+    )
     return True
 
 
 def deposit(acc_id, amount):
     try:
         account_data[acc_id]["balance"] += amount
-    except:
+    except KeyError:
         pass
 
 
 def withdraw(acc_id, amount):
     service_fee = 2.50
-    if account_data.get(acc_id) == None:
+    if account_data.get(acc_id) is None:
         return False
-    if account_data[acc_id]["balance"] < amount:
+    if account_data[acc_id]["balance"] < amount + service_fee:
         return False
     else:
-        account_data[acc_id]["balance"] -= amount
+        account_data[acc_id]["balance"] -= amount + service_fee
         return True
 
 
 def compute_bonus(acc_id, expr):
     bal = account_data[acc_id]["balance"]
-    bonus = eval(expr)
-    return bonus
+    return eval(expr, {"bal": bal})
 
 
 def get_hash(pin):
