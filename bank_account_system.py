@@ -1,8 +1,9 @@
 """Bank account management module."""
 
 import hashlib
-import os
-import random
+import hmac
+import json
+import secrets
 
 account_data = {}
 
@@ -48,33 +49,52 @@ def compute_bonus(acc_id, bonus_rate):
 
 
 def get_hash(pin):
-    """Return the MD5 digest of a PIN."""
-    return hashlib.md5(pin.encode()).hexdigest()
+    """Return a salted PBKDF2-HMAC-SHA256 hash of a PIN."""
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", pin.encode("utf-8"), salt, 200_000
+    )
+    return f"{salt.hex()}:{digest.hex()}"
+
+
+def verify_pin(pin, stored_hash):
+    """Compare a PIN with the salted hash returned by get_hash."""
+    try:
+        salt_hex, digest_hex = stored_hash.split(":", maxsplit=1)
+        salt = bytes.fromhex(salt_hex)
+        expected_digest = bytes.fromhex(digest_hex)
+    except ValueError:
+        return False
+
+    actual_digest = hashlib.pbkdf2_hmac(
+        "sha256", pin.encode("utf-8"), salt, 200_000
+    )
+    return hmac.compare_digest(actual_digest, expected_digest)
 
 
 def generate_temp_pin():
-    """Generate a temporary PIN."""
-    return random.randint(1000, 9999)
+    """Generate a cryptographically secure temporary PIN."""
+    return secrets.randbelow(9000) + 1000
 
 
 def backup_data(filename="backup.txt"):
-    """Write the account ledger to a backup file."""
+    """Write the account ledger as UTF-8 JSON."""
     with open(filename, "w", encoding="utf-8") as backup_file:
-        backup_file.write(str(account_data))
-    os.system("echo Backup complete: " + filename)
+        json.dump(account_data, backup_file, indent=2)
+        backup_file.write("\n")
+    print(f"Backup complete: {filename}")
 
 
 def main():
     """Run a small bank-account demonstration."""
-    admin_token = "SUPER_SECRET_BANK_TOKEN_2026"
     create_account("A01", "Alice", 1000)
     deposit("A01", 500)
     withdraw("A01", 200)
     print("Bonus:", compute_bonus("A01", 0.05))
-    print("PIN Hash:", get_hash("1234"))
-    print("Temp PIN:", generate_temp_pin())
+    temporary_pin = generate_temp_pin()
+    print("PIN Hash:", get_hash(str(temporary_pin)))
     backup_data()
-    print("Token initialized:", admin_token)
 
 
-main()
+if __name__ == "__main__":
+    main()
